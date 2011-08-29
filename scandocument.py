@@ -25,7 +25,7 @@ THE SOFTWARE.
 """
 
 __author__ = 'Sergei Trofimov'
-__version__ = (0, 1, 0)
+__version__ = (0, 1, 1)
 
 import os
 import sys
@@ -70,7 +70,7 @@ def scan_page(cmd, cmdopts, outdir, pageno):
     args = [' '.join(['>', outfile]),]
     commandstring = make_command(scanimage, args, scanimage_opts)
     execute_command(commandstring)
-    return get_response('Scan the next page?')
+    return get_response('Scan the next page ({0})?'.format(pageno+1))
 
 def convert_to_pdf(workdir):
     for filepath in glob(os.path.join(workdir, '*.tiff')):
@@ -90,13 +90,31 @@ def convert_to_pdf(workdir):
 
 def join_pdf_pages(workdir, outfile):
     tempfiles = os.path.join(workdir, '*.pdf')
-    commandstring = '{0} {1} -o \'{2}\''.format(pdfjoin, ' '.join(glob(tempfiles)), outfile)
+    commandstring = '{0} {1} -o "{2}"'.format(pdfjoin, 
+                                              ' '.join(glob(tempfiles)), 
+                                              os.path.expanduser(outfile))
     execute_command(commandstring)
     logging.debug('removing ' + tempfiles)
     for f in glob(tempfiles):
         os.remove(f)
 
+def print_help():
+    print 'python scandocument.py [OUTFILE]'
+    print
+    print 'Scan a multi-page document into a .pdf file (OUTFILE).'
+    print 'If OUTFILE isn\'t specifified, it will be read from STDIN.'
+    print
+
 if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        if sys.argv[1] == '-h' or sys.argv[1] == '--help':
+            print_help()
+            sys.exit(0)
+        outfile = sys.argv[1]
+    else:
+        outfile = raw_input('Please specify output file: ')
+        if not outfile.lower().endswith('.pdf'):
+            outfile += '.pdf'
     workdir = mkdtemp()
     logging.debug('using temp dir: {0}'.format(workdir))
     raw_input('Insert the first page into the scanner and press return.')
@@ -105,12 +123,6 @@ if __name__ == '__main__':
         page_count += 1
     print 'Converting...'
     convert_to_pdf(workdir)
-    if len(sys.argv) > 1:
-        outfile = sys.argv[1]
-    else:
-        outfile = raw_input('Please specify output file: ')
-        if not outfile.lower().endswith('.pdf'):
-            outfile += '.pdf'
     logging.debug('writing to ' + outfile)
     print 'Writing output.'
     join_pdf_pages(workdir, outfile)
