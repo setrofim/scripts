@@ -33,7 +33,7 @@ import logging
 from glob import glob
 from tempfile import mkdtemp
 
-logging.basicConfig(level=logging.DEBUG)
+#logging.basicConfig(level=logging.DEBUG)
 
 scanimage = '/usr/bin/scanimage'
 scanimage_opts = {
