@@ -25,7 +25,7 @@ THE SOFTWARE.
 """
 
 __author__ = 'Sergei Trofimov'
-__version__ = (0, 1, 1)
+__version__ = (0, 1, 2)
 
 import os
 import sys
@@ -37,18 +37,20 @@ from tempfile import mkdtemp
 
 scanimage = '/usr/bin/scanimage'
 scanimage_opts = {
-        'resolution':300,
-        'format':'tiff',
-        }
+    'resolution': 300,
+    'format': 'tiff',
+}
 tiff2ps = '/usr/bin/tiff2ps'
 ps2pdf = '/usr/bin/ps2pdf'
 pdfjoin = '/usr/bin/pdfjoin'
 
+
 def make_command(cmd, args, opts):
-    return ' '.join([cmd, 
+    return ' '.join([cmd,
                      ' '.join(['--{0}={1}'.format(*i) for i in opts.items()]),
                      ' '.join(map(str, args)),
-                   ])
+                     ])
+
 
 def get_response(message):
     resp = raw_input(message + ' yes/no: [yes]').lower()
@@ -60,17 +62,26 @@ def get_response(message):
         else:
             resp = raw_input(message + ' yes/no: [yes]').lower()
 
+
 def execute_command(commandstring):
     logging.debug('executing: {0}'.format(commandstring))
     res = os.system(commandstring)
     logging.debug('returned: {0}'.format(res))
+    return res
+
 
 def scan_page(cmd, cmdopts, outdir, pageno):
-    outfile = os.path.join(outdir, ''.join([os.path.basename(cmd), str(pageno), '.tiff']))
-    args = [' '.join(['>', outfile]),]
+    outfile = os.path.join(outdir, ''.join(
+        [os.path.basename(cmd), "{0:02}".format(pageno), '.tiff']
+    ))
+    args = [' '.join(['>', outfile]), ]
     commandstring = make_command(scanimage, args, scanimage_opts)
-    execute_command(commandstring)
-    return get_response('Scan the next page ({0})?'.format(pageno+1))
+    status = execute_command(commandstring)
+    if status:
+        print "ERROR:", status
+        sys.exit(1)
+    return get_response('Scan the next page ({0})?'.format(pageno + 1))
+
 
 def convert_to_pdf(workdir):
     for filepath in glob(os.path.join(workdir, '*.tiff')):
@@ -88,15 +99,18 @@ def convert_to_pdf(workdir):
         os.remove(psfile)
     print
 
+
 def join_pdf_pages(workdir, outfile):
-    tempfiles = os.path.join(workdir, '*.pdf')
-    commandstring = '{0} {1} -o "{2}"'.format(pdfjoin, 
-                                              ' '.join(glob(tempfiles)), 
+    tempfiles = map(
+        lambda x: os.path.join(workdir, x), sorted(os.listdir(workdir)))
+    commandstring = '{0} {1} -o "{2}"'.format(pdfjoin,
+                                              ' '.join(tempfiles),
                                               os.path.expanduser(outfile))
     execute_command(commandstring)
-    logging.debug('removing ' + tempfiles)
-    for f in glob(tempfiles):
+    logging.debug('removing ' + workdir)
+    for f in tempfiles:
         os.remove(f)
+
 
 def print_help():
     print 'python scandocument.py [OUTFILE]'
@@ -115,18 +129,21 @@ if __name__ == '__main__':
         outfile = raw_input('Please specify output file: ')
         if not outfile.lower().endswith('.pdf'):
             outfile += '.pdf'
+
     workdir = mkdtemp()
     logging.debug('using temp dir: {0}'.format(workdir))
     raw_input('Insert the first page into the scanner and press return.')
+
     page_count = 1
     while scan_page(scanimage, scanimage_opts, workdir, page_count):
         page_count += 1
+
     print 'Converting...'
     convert_to_pdf(workdir)
     logging.debug('writing to ' + outfile)
+
     print 'Writing output.'
     join_pdf_pages(workdir, outfile)
     logging.debug('removing ' + workdir)
     os.rmdir(workdir)
     print 'Done.'
-
